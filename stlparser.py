@@ -9,10 +9,6 @@ Help and original code from: http://stackoverflow.com/questions/7566825/python-p
 """
 
 import struct
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
 import sys
 
@@ -88,11 +84,38 @@ class SolidSTL(object):
         """
         WARNING: THIS IS THE NUMBER OF TRIANGLE EDGES, NOT THE OVERALL EDGES OF THE SOLID
         """
+# Calculate volume fo the 3D mesh using Tetrahedron volume
+# based in: http://stackoverflow.com/questions/1406029/how-to-calculate-the-volume-of-a-3d-mesh-object-the-surface-of-which-is-made-up
+        def signedVolumeOfTriangle(p1, p2, p3):
+            v321 = p3[0] * p2[1] * p1[2]
+            v231 = p2[0] * p3[1] * p1[2]
+            v312 = p3[0] * p1[1] * p2[2]
+            v132 = p1[0] * p3[1] * p2[2]
+            v213 = p2[0] * p1[1] * p3[2]
+            v123 = p1[0] * p2[1] * p3[2]
+            return (1.0 / 6.0) * (-v321 + v231 + v312 - v132 - v213 + v123)
+
         self.vertices = set()
+        self.min_x = float("inf")
+        self.min_y = float("inf")
+        self.min_z = float("inf")
+        self.max_x = float("-inf")
+        self.max_y = float("-inf")
+        self.max_z = float("-inf")
+        totalVolume = 0
+
         for triangle in self.triangles:
+            totalVolume += signedVolumeOfTriangle(triangle[0], triangle[1], triangle[2])
             for vertex in triangle:
                 self.vertices.add(vertex)
+                self.min_x = min(self.min_x, vertex[0])
+                self.max_x = max(self.max_x, vertex[0])
+                self.min_y = min(self.min_y, vertex[1])
+                self.max_y = max(self.max_y, vertex[1])
+                self.min_z = min(self.min_z, vertex[2])
+                self.max_z = max(self.max_z, vertex[2])
 
+        self.totalVolume = totalVolume / 1000
         return self.vertices
 
 def createVerticalCuboid(topPoint, edgeLength=1.0):
@@ -205,41 +228,6 @@ def __getSupportDirection(origin, vector, scale=1.0):
     # Does not require support material, don't plot anything
     return None
     
-def display(stlsolid, showNorms=True, showSupportDirections=False):
-    """
-    Renders the solid and normal vectors using matplotlib
-    """
-    fig = plt.figure()
-    #ax = Axes3D(fig)
-    ax = fig.gca(projection='3d')
-    
-    triangles = stlsolid.triangles
-    norms = stlsolid.norms
-
-    for i in xrange(len(triangles)):
-            
-        triangle = triangles[i]
-       
-        face = Poly3DCollection([triangle])
-        face.set_alpha(0.5)
-        ax.add_collection3d(face)
-
-        if showNorms or showSupportDirections:
-            centroid = __getTriangleCentroid(triangle)
-            norm = norms[i]
-        
-            if showNorms:
-                xs, ys, zs = __getNormalLine(centroid, norm, 10)
-                ax.plot(xs, ys, zs)
-
-            if showSupportDirections:
-                supportDirs = __getSupportDirection(centroid, norm, 10)
-                if not supportDirs is None:
-                    xs, ys, zs = supportDirs
-                    ax.plot(xs, ys, zs)
-
-    plt.show()
-
 def loadBSTL(bstl):
     """
     Loads triangles from file, input can be a file path or a file handler
@@ -295,12 +283,12 @@ def loadSTL(infilename):
         if not name[0] == "solid":
             raise IOError("Expecting first input as \"solid\" [name]")
         
-        if len(name) == 2:
+        if len(name) >= 2:
             title = name[1]
         elif len(name) == 1:
             title = None
-        else:
-            raise IOError("Too many inputs to first line")
+#        else:
+#            raise IOError("Too many inputs to first line")
         
         triangles = []
         norms = []
@@ -359,7 +347,18 @@ def saveSTL(stlsolid, outfilename):
 
 if __name__ == "__main__":
     model = loadBSTL(sys.argv[1])
-    __shiftUp(model,5)
-    addCuboidSupports(model)
-    display(model)
+#    model = loadSTL(sys.argv[1])
+#    print model.triangles
+#    print model.vertices
+    print model.min_x
+    print model.min_y
+    print model.min_z
+    print model.max_x
+    print model.max_y
+    print model.max_z
+    print model.totalVolume
+
+#    __shiftUp(model,5)
+#    addCuboidSupports(model)
+#    display(model)
 
